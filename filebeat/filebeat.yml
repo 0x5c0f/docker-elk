@@ -1,0 +1,52 @@
+filebeat.inputs:
+
+- type: log
+  enabled: true
+  paths:
+    - /pathto/app.log
+  fields:
+    app_id: app_name
+    app_system: app.master 
+
+  # 多行收集 日志开头格式： 2020-01-16 00:00:00.114
+  multiline.pattern: '^(19|20)\d\d-(0[1-9]|1[012])-(0[1-9]|[12][0-9]|3[01]) [012][0-9]:[0-6][0-9]:[0-6][0-9]'
+  multiline.negate: true
+  multiline.match: after
+  
+  document_type: java_logs
+  include_lines: [' ERROR', ' WARN']
+
+processors:
+- drop_fields:
+    fields: ["prospector","source","input", "beat", "offset","tags","host"]
+  
+name: "hostname-0.0.0.0"
+
+#============================= Filebeat modules ===============================
+
+filebeat.config.modules:
+  path: ${path.config}/modules.d/*.yml
+  reload.enabled: false
+
+
+setup.template.settings:
+  index.number_of_shards: 1
+  
+setup.kibana:
+
+output.elasticsearch:
+  hosts: ["0.0.0.0:9200"]
+  indices:
+    - index: "%{[fields.app_id]}-warn-%{+yyyy.MM.dd}"
+      when.contains:
+        message: " WARN"
+    - index: "%{[fields.app_id]}-error-%{+yyyy.MM.dd}"
+      when.contains:
+        message: " ERROR"
+
+
+processors:
+  - add_host_metadata: ~
+  - add_cloud_metadata: ~
+  - add_docker_metadata: ~
+  - add_kubernetes_metadata: ~
